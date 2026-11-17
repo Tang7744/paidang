@@ -115,7 +115,7 @@ window.PADANG_MEDIA = {
   };
   function media(who,cls='',loop=true) {
     const item=M[who];
-    return `<video class="photo-video ${cls}" data-person="${who}" aria-label="${who==='sienna'?'Sngc 的视频':'你的视频'}" poster="${item.poster}" src="${item.src}" muted ${loop?'loop':''} playsinline preload="metadata"></video>`;
+    return `<video class="photo-video ${cls}" data-person="${who}" aria-label="${who==='sienna'?'Sngc 的视频':'你的视频'}" poster="${item.poster}" src="${item.src}" muted ${loop?'loop':''} playsinline preload="none"></video>`;
   }
   const sequencePlayback = new WeakMap();
   let activeVideo=null, playbackRequest=0, playbackSuppressed=false;
@@ -154,6 +154,7 @@ window.PADANG_MEDIA = {
   }
   function playWithSound(video) {
     if(!canPlay(video)){stopVideo(video);return;}
+    if(prepareMediaPlayback(video)) return;
     const request=++playbackRequest;
     if(activeVideo&&activeVideo!==video)stopVideo(activeVideo);
     screen.querySelectorAll('video').forEach(other=>{if(other!==video)stopVideo(other);});
@@ -300,7 +301,61 @@ window.PADANG_MEDIA = {
   let outgoingPage = null;
   const warmedAssets = new Set();
   const warmImages = [];
-  const warmVideos = new Map();
+  const preparedVideos = new Map();
+  const pendingVideos = new Map();
+  function prepareVideo(who) {
+    if(preparedVideos.has(who)) return Promise.resolve(preparedVideos.get(who));
+    if(pendingVideos.has(who)) return pendingVideos.get(who);
+    const task=fetch(window.PADANG_ASSETS[M[who].src]).then(response=>{
+      if(!response.ok) throw new Error('Video could not be loaded');
+      return response.blob();
+    }).then(blob=>{
+      const url=URL.createObjectURL(blob);
+      preparedVideos.set(who,url);window.PADANG_ASSETS[M[who].src]=url;
+      pendingVideos.delete(who);return url;
+    }).catch(error=>{pendingVideos.delete(who);throw error;});
+    pendingVideos.set(who,task);return task;
+  }
+  function prepareMediaPlayback(video) {
+    const who=video.dataset.person;
+    const ready=preparedVideos.get(who);
+    if(ready) {
+      if(video.getAttribute('src')!==ready){video.src=ready;video.load();}
+      return false;
+    }
+    if(video.dataset.preparing==='true') return true;
+    video.dataset.preparing='true';
+    prepareVideo(who).then(url=>{
+      video.dataset.preparing='false';
+      if(!canPlay(video)) return;
+      video.src=url;video.load();playWithSound(video);
+    }).catch(()=>{
+      video.dataset.preparing='false';
+      if(!canPlay(video)) return;
+      const host=video.parentElement;
+      host.querySelector('.media-loading-hint')?.setAttribute('hidden','');
+      if(host.querySelector('.media-retry')) return;
+      const retry=document.createElement('button');retry.className='media-retry';retry.textContent='重试加载视频';
+      retry.onclick=event=>{event.stopPropagation();retry.remove();playWithSound(video);};
+      host.append(retry);
+    });
+    return true;
+  }
+  async function startPreparedRecording() {
+    const epoch=state.epoch;
+    const trigger=screen.querySelector('[data-action="start-record"]');
+    if(!trigger||trigger.disabled) return;
+    trigger.disabled=true;
+    const hint=document.createElement('span');hint.className='media-loading-hint';
+    hint.setAttribute('role','status');hint.textContent='正在准备视频…';
+    screen.querySelector('.camera-preview').append(hint);
+    try {
+      await prepareVideo('sienna');
+      if(state.page==='camera'&&state.epoch===epoch){state.recordingSeconds=0;navigate('recording');}
+    } catch {
+      if(state.page==='camera'&&state.epoch===epoch) toast('视频加载失败，请重试');
+    } finally {hint.remove();trigger.disabled=false;}
+  }
   function warmNextAssets(page) {
     if(navigator.connection?.saveData) return;
     const upcoming = page==='chat'
@@ -313,15 +368,9 @@ window.PADANG_MEDIA = {
       setTimeout(()=>{const image=new Image();image.decoding='async';image.fetchPriority='low';image.src=url;warmImages.push(image);},800);
     }
     // Warm the next short clip only after the user enters the shooting flow.
-    const who=['topics','detail','camera'].includes(page)?'sienna':page==='captured'?'you':null;
-    if(!who||warmVideos.has(who)) return;
-    const clip=document.createElement('video');
-    clip.hidden=true;clip.muted=true;clip.playsInline=true;clip.preload='auto';
-    clip.setAttribute('aria-hidden','true');
-    clip.src=window.PADANG_ASSETS[M[who].src];
-    warmVideos.set(who,clip);
-    document.body.append(clip);
-    clip.load();
+    if(['topics','detail','camera','captured'].includes(page)) {
+      prepareVideo('sienna').then(()=>prepareVideo('you')).catch(()=>{});
+    }
   }
   function bindMediaLoading() {
     screen.querySelectorAll('video').forEach(video=>{
@@ -489,7 +538,7 @@ window.PADANG_MEDIA = {
     'camera':()=>{state.recordingSeconds=0;navigate('camera');},
     'retake':()=>{state.recordingSeconds=0;navigate('camera');},
     'cancel-camera':()=>navigate(state.revealed?'unlocked':state.submitted?'sealed':'detail'),
-    'start-record':()=>{state.recordingSeconds=0;navigate('recording');},
+    'start-record':startPreparedRecording,
     'stop-record':()=>navigate('captured'),
     'clear-record':()=>{state.recordingSeconds=0;navigate('camera');},
     'submit-take':()=>{state.submitted=true;state.revealed=false;state.card=0;navigate('sealed');},
