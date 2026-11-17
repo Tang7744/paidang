@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <title>麦克风</title>
+  <rect x="8" y="2" width="8" height="13.5" rx="4" fill="#000"/>
+  <path d="M4.5 9.5V12C4.5 16.4 7.4 19 12 19C16.6 19 19.5 16.4 19.5 12V9.5M12 19V22" stroke="#000" stroke-width="1.8" stroke-linecap="square"/>
+</svg>

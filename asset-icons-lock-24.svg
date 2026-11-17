@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <title>锁定</title>
+  <path d="M8.25 11V7.5A3.75 3.75 0 0 1 15.75 7.5V11" stroke="#ADADAB" stroke-width="2.6"/>
+  <path fill="#ADADAB" fill-rule="evenodd" clip-rule="evenodd" d="M6.6 10H17.4C19.2 10 20.2 11.1 20.2 12.9V19.1C20.2 20.9 19.2 22 17.4 22H6.6C4.8 22 3.8 20.9 3.8 19.1V12.9C3.8 11.1 4.8 10 6.6 10ZM11.2 14.3V17.7C11.2 18 11.4 18.2 11.7 18.2H12.3C12.6 18.2 12.8 18 12.8 17.7V14.3C12.8 14 12.6 13.8 12.3 13.8H11.7C11.4 13.8 11.2 14 11.2 14.3Z"/>
+</svg>
